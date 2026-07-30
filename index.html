@@ -301,164 +301,247 @@
     </div>
 
   </div>
+<script>
+  // --- שעון בלייב ---
+  function updateClock() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
 
-  <script>
-    // --- שעון בלייב ---
-    function updateClock() {
-      const now = new Date();
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
-      document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
+  // --- משתנים גלובליים ---
+  let isLive = false;
+  let isMicOn = false;
+  let micStream = null;
+  const playlist = [];
+  let currentIndex = -1;
 
-    // --- משתנים גלובליים ---
-    let isLive = false;
-    let isMicOn = false;
-    let micStream = null;
-    const playlist = [];
-    let currentIndex = -1;
+  const audioPlayer = document.getElementById('audioPlayer');
+  const queueDisplay = document.getElementById('queueDisplay');
 
-    const audioPlayer = document.getElementById('audioPlayer');
-    const queueDisplay = document.getElementById('queueDisplay');
+  // --- מיקרופון + Ducking ---
+  async function toggleMicrophone() {
+    const micBtn = document.getElementById('micBtn');
+    const duckingEnabled = document.getElementById('duckingToggle').checked;
 
-    // --- מיקרופון + Ducking ---
-    async function toggleMicrophone() {
-      const micBtn = document.getElementById('micBtn');
-      const duckingEnabled = document.getElementById('duckingToggle').checked;
-
-      if (!isMicOn) {
-        try {
-          micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          isMicOn = true;
-          micBtn.innerText = "🎙️ מדבר כעת! (לחץ לכיבוי)";
-          micBtn.classList.add("active");
-
-          if (duckingEnabled) {
-            audioPlayer.volume = 0.2;
-          }
-        } catch (err) {
-          alert("לא ניתן לגשת למיקרופון. אנא אשר הרשאות בדפדפן.");
-        }
-      } else {
-        if (micStream) {
-          micStream.getTracks().forEach(track => track.stop());
-        }
-        isMicOn = false;
-        micBtn.innerText = "🎙️ דבר (מיקרופון כבוי)";
-        micBtn.classList.remove("active");
+    if (!isMicOn) {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        isMicOn = true;
+        micBtn.innerText = "🎙️ מדבר כעת! (לחץ לכיבוי)";
+        micBtn.classList.add("active");
 
         if (duckingEnabled) {
-          audioPlayer.volume = document.getElementById('musicVol').value;
+          audioPlayer.volume = 0.2;
         }
+      } catch (err) {
+        alert("לא ניתן לגשת למיקרופון. אנא אשר הרשאות בדפדפן.");
+      }
+    } else {
+      if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+      }
+      isMicOn = false;
+      micBtn.innerText = "🎙️ דבר (מיקרופון כבוי)";
+      micBtn.classList.remove("active");
+
+      if (duckingEnabled) {
+        audioPlayer.volume = document.getElementById('musicVol').value;
       }
     }
+  }
 
-    // --- הפעלה/כיבוי שידור ראשי ---
-    function toggleMainStream() {
-      isLive = !isLive;
-      const statusBadge = document.getElementById('airStatus');
-      const mainBtn = document.getElementById('toggleStreamBtn');
+  // --- הפעלה/כיבוי שידור ראשי ---
+  function toggleMainStream() {
+    isLive = !isLive;
+    const statusBadge = document.getElementById('airStatus');
+    const mainBtn = document.getElementById('toggleStreamBtn');
 
-      if (isLive) {
-        statusBadge.innerText = "ON AIR 🟢";
-        statusBadge.classList.add("on-air");
-        mainBtn.style.background = "#16a34a";
-      } else {
-        statusBadge.innerText = "OFF AIR 🔴";
-        statusBadge.classList.remove("on-air");
-        mainBtn.style.background = "#dc2626";
-      }
+    if (isLive) {
+      statusBadge.innerText = "ON AIR 🟢";
+      statusBadge.classList.add("on-air");
+      mainBtn.style.background = "#16a34a";
+    } else {
+      statusBadge.innerText = "OFF AIR 🔴";
+      statusBadge.classList.remove("on-air");
+      mainBtn.style.background = "#dc2626";
     }
+  }
 
-    // --- נגן ותור השמעה ---
-    function loadMusicFiles(input) {
-      const files = Array.from(input.files);
-      if (files.length === 0) return;
+  // --- נגן ותור השמעה ---
+  function loadMusicFiles(input) {
+    const files = Array.from(input.files);
+    if (files.length === 0) return;
 
-      files.forEach(file => {
-        playlist.push({ name: file.name, url: URL.createObjectURL(file) });
-      });
-
-      if (currentIndex === -1 && playlist.length > 0) {
-        playTrack(0);
-      } else {
-        renderQueue();
-      }
-    }
-
-    function playTrack(index) {
-      if (index < 0 || index >= playlist.length) return;
-      currentIndex = index;
-      audioPlayer.src = playlist[currentIndex].url;
-      audioPlayer.play();
-      renderQueue();
-    }
-
-    function renderQueue() {
-      queueDisplay.innerHTML = '';
-      if (playlist.length === 0) {
-        queueDisplay.innerHTML = '<li class="queue-item" style="color: var(--text-dim);">אין שירים בתור...</li>';
-        return;
-      }
-
-      playlist.forEach((track, i) => {
-        const li = document.createElement('li');
-        li.className = `queue-item ${i === currentIndex ? 'active' : ''}`;
-        li.innerHTML = `
-          <span>${i + 1}. ${track.name}</span>
-          <button class="remove-btn" onclick="removeTrack(${i}, event)">✖</button>
-        `;
-        li.onclick = () => playTrack(i);
-        queueDisplay.appendChild(li);
-      });
-    }
-
-    function removeTrack(index, event) {
-      event.stopPropagation();
-      playlist.splice(index, 1);
-      if (index === currentIndex) {
-        if (playlist.length > 0) playTrack(index % playlist.length);
-        else { audioPlayer.src = ''; currentIndex = -1; }
-      } else if (index < currentIndex) {
-        currentIndex--;
-      }
-      renderQueue();
-    }
-
-    function nextTrack() {
-      if (currentIndex + 1 < playlist.length) {
-        playTrack(currentIndex + 1);
-      }
-    }
-
-    audioPlayer.addEventListener('ended', () => {
-      if (currentIndex + 1 < playlist.length) {
-        playTrack(currentIndex + 1);
-      }
+    files.forEach(file => {
+      playlist.push({ name: file.name, url: URL.createObjectURL(file) });
     });
 
-    function setVolume(val) {
-      if (!isMicOn || !document.getElementById('duckingToggle').checked) {
-        audioPlayer.volume = val;
+    if (currentIndex === -1 && playlist.length > 0) {
+      playTrack(0);
+    } else {
+      renderQueue();
+    }
+  }
+
+  function playTrack(index) {
+    if (index < 0 || index >= playlist.length) return;
+    currentIndex = index;
+    audioPlayer.src = playlist[currentIndex].url;
+    audioPlayer.play();
+    renderQueue();
+  }
+
+  function renderQueue() {
+    queueDisplay.innerHTML = '';
+    if (playlist.length === 0) {
+      queueDisplay.innerHTML = '<li class="queue-item" style="color: var(--text-dim);">אין שירים בתור...</li>';
+      return;
+    }
+
+    playlist.forEach((track, i) => {
+      const li = document.createElement('li');
+      li.className = `queue-item ${i === currentIndex ? 'active' : ''}`;
+      li.innerHTML = `
+        <span>${i + 1}. ${track.name}</span>
+        <button class="remove-btn" onclick="removeTrack(${i}, event)">✖</button>
+      `;
+      li.onclick = () => playTrack(i);
+      queueDisplay.appendChild(li);
+    });
+  }
+
+  function removeTrack(index, event) {
+    event.stopPropagation();
+    playlist.splice(index, 1);
+    if (index === currentIndex) {
+      if (playlist.length > 0) playTrack(index % playlist.length);
+      else { audioPlayer.src = ''; currentIndex = -1; }
+    } else if (index < currentIndex) {
+      currentIndex--;
+    }
+    renderQueue();
+  }
+
+  function nextTrack() {
+    if (currentIndex + 1 < playlist.length) {
+      playTrack(currentIndex + 1);
+    }
+  }
+
+  audioPlayer.addEventListener('ended', () => {
+    if (currentIndex + 1 < playlist.length) {
+      playTrack(currentIndex + 1);
+    }
+  });
+
+  function setVolume(val) {
+    if (!isMicOn || !document.getElementById('duckingToggle').checked) {
+      audioPlayer.volume = val;
+    }
+  }
+
+  // --- קריין AI משופר ---
+  function speakAI() {
+    const text = document.getElementById('aiText').value;
+    if (!text) return alert("אנא הכנס טקסט לקריין");
+    
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    
+    const voices = window.speechSynthesis.getVoices();
+    const hebrewVoice = voices.find(v => v.lang.includes('he'));
+    if (hebrewVoice) {
+      utterance.voice = hebrewVoice;
+    }
+    
+    utterance.lang = 'he-IL';
+    utterance.rate = document.getElementById('speechRate').value;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // --- מנוע אפקטים קוליים (עובד בלייב!) ---
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  function playSound(type) {
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'applause') {
+      // סימולציית מחיאות כפיים (רעש לבן פועם)
+      const bufferSize = audioCtx.sampleRate * 1.5;
+      const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+      const noise = audioCtx.createBufferSource();
+      noise.buffer = buffer;
+      const noiseFilter = audioCtx.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 1000;
+      noise.connect(noiseFilter);
+      noiseFilter.connect(gain);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+      noise.start(now);
+    } 
+    else if (type === 'jingle') {
+      // ג'ינגל פתיחה קצר (סולם צלילים)
+      const notes = [261.63, 329.63, 392.00, 523.25];
+      notes.forEach((freq, idx) => {
+        const noteOsc = audioCtx.createOscillator();
+        const noteGain = audioCtx.createGain();
+        noteOsc.frequency.value = freq;
+        noteOsc.connect(noteGain);
+        noteGain.connect(audioCtx.destination);
+        const startTime = now + idx * 0.15;
+        noteGain.gain.setValueAtTime(0.2, startTime);
+        noteGain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+        noteOsc.start(startTime);
+        noteOsc.stop(startTime + 0.3);
+      });
+    } 
+    else if (type === 'siren') {
+      // צפירת רדיו פועמת
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.linearRampToValueAtTime(800, now + 0.3);
+      osc.frequency.linearRampToValueAtTime(400, now + 0.6);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+      osc.start(now);
+      osc.stop(now + 0.6);
+    } 
+    else if (type === 'laugh') {
+      // סאונד קצבי (אפקט צחוק קהל)
+      for (let i = 0; i < 5; i++) {
+        const laughOsc = audioCtx.createOscillator();
+        const laughGain = audioCtx.createGain();
+        laughOsc.frequency.value = 300 + Math.random() * 100;
+        laughOsc.connect(laughGain);
+        laughGain.connect(audioCtx.destination);
+        const startTime = now + i * 0.12;
+        laughGain.gain.setValueAtTime(0.2, startTime);
+        laughGain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.1);
+        laughOsc.start(startTime);
+        laughOsc.stop(startTime + 0.1);
       }
     }
-
-    // --- קריין AI ---
-    function speakAI() {
-      const text = document.getElementById('aiText').value;
-      if (!text) return alert("אנא הכנס טקסט לקריין");
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'he-IL';
-      utterance.rate = document.getElementById('speechRate').value;
-      window.speechSynthesis.speak(utterance);
-    }
-
-    function playSound(type) { alert("אפקט: " + type); }
-  </script>
-
+  }
+</script>
+  
 </body>
 </html>
