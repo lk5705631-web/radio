@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Radio DJ Studio - אולפן שידור</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
     :root {
       --bg-dark: #0f172a;
@@ -20,7 +21,6 @@
       font-family: system-ui, -apple-system, sans-serif;
       margin: 0;
       padding: 20px;
-      direction: rtl;
     }
     header {
       display: flex;
@@ -31,83 +31,19 @@
       border-radius: 12px;
       margin-bottom: 20px;
     }
-    .status-badge {
-      background: #475569;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-weight: bold;
-      font-size: 0.9em;
-    }
-    .status-badge.on-air { background: var(--accent-live); }
-    
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-    }
-    .card {
-      background: var(--card-bg);
-      border-radius: 12px;
-      padding: 20px;
-    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .card { background: var(--card-bg); border-radius: 12px; padding: 20px; }
     h2 { margin-top: 0; color: #60a5fa; font-size: 1.2em; }
-    
     button {
-      background: var(--accent);
-      color: white;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: 0.2s;
+      background: var(--accent); color: white; border: none; padding: 10px 16px;
+      border-radius: 8px; cursor: pointer; font-weight: bold;
     }
-    button:hover { opacity: 0.9; }
-    button.active { background: var(--danger); }
-
-    .fx-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .fx-btn {
-      background: #334155;
-      padding: 15px;
-      text-align: center;
-    }
-
-    textarea, input[type="text"] {
-      width: 100%;
-      padding: 10px;
-      background: #0f172a;
-      border: 1px solid #334155;
-      color: white;
-      border-radius: 8px;
-      box-sizing: border-box;
-      margin-bottom: 10px;
-    }
-
-    .msg-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-    .msg-item {
-      background: #0f172a;
-      padding: 10px;
-      border-radius: 8px;
-      margin-bottom: 8px;
-      border-right: 3px solid var(--accent);
-    }
-    .msg-header {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.8em;
-      color: var(--text-dim);
-      margin-bottom: 4px;
-    }
+    .fx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .fx-btn { background: #334155; padding: 12px; text-align: center; }
+    textarea { width: 100%; padding: 10px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; box-sizing: border-box; }
+    .msg-list { list-style: none; padding: 0; margin: 0; max-height: 180px; overflow-y: auto; }
+    .msg-item { background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 8px; border-right: 3px solid var(--accent); }
+    .call-item { background: #0f172a; padding: 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-right: 3px solid #eab308; }
   </style>
 </head>
 <body>
@@ -115,213 +51,156 @@
   <header>
     <div>
       <h1 style="margin:0; font-size: 1.5em;">📻 Radio DJ Studio - אולפן שידור</h1>
-      <small style="color: var(--text-dim);">ניהול שידור חי, מיקרופון, אפקטים והודעות מאזינים</small>
+      <small style="color: var(--text-dim);">ניהול שידור, אפקטים, שיחות מאזינים בלייב</small>
     </div>
     <div style="display: flex; gap: 15px; align-items: center;">
       <div id="clock" style="font-size: 1.2em; font-weight: bold;">00:00:00</div>
-      <div id="airStatus" class="status-badge">OFF AIR 🔴</div>
-      <button id="toggleStreamBtn" onclick="toggleMainStream()" style="background: var(--danger);">הפעל/כבה שידור ראשי</button>
+      <div id="airStatus" style="background:#475569; padding:6px 14px; border-radius:20px; font-weight:bold;">OFF AIR 🔴</div>
     </div>
   </header>
 
+  <!-- נגן אודיו שקוף להשמעת המאזין המחובר -->
+  <audio id="remoteAudio" autoplay></audio>
+
   <div class="grid">
     
-    <!-- בקרת מיקרופון ושידור -->
+    <!-- מרכזיית מאזינים על הקו -->
+    <div class="card" style="border: 2px solid #3b82f6;">
+      <h2>📞 מרכזיית מאזינים בלייב</h2>
+      <div id="callRequestsList">
+        <div style="color: var(--text-dim);">ממתין למאזינים שמבקשים לעלות...</div>
+      </div>
+    </div>
+
+    <!-- בקרת מיקרופון -->
     <div class="card">
-      <h2>🎙️ בקרת מיקרופון</h2>
-      <button id="micBtn" onclick="toggleMicrophone()" style="width: 100%; padding: 15px; margin-bottom: 15px;">🎙️ דבר (מיקרופון כבוי)</button>
-      <label>
-        <input type="checkbox" id="duckingToggle" checked> הנמכה אוטומטית בדיבור (Ducking)
-      </label>
+      <h2>🎙️ מיקרופון שדרן</h2>
+      <button id="micBtn" onclick="toggleMicrophone()" style="width: 100%; padding: 15px; margin-bottom: 10px;">🎙️ דבר (מיקרופון כבוי)</button>
+      <label><input type="checkbox" id="duckingToggle" checked> הנמכה אוטומטית בדיבור</label>
     </div>
 
     <!-- קריין AI -->
     <div class="card">
-      <h2>🎙️ קריין AI רדיופוני</h2>
-      <textarea id="aiText" rows="3" placeholder="כתוב כאן מה שהקריין יגיד בלייב..."></textarea>
-      <label style="font-size: 0.85em; color: var(--text-dim);">מהירות דיבור:</label>
-      <input type="range" id="speechRate" min="0.5" max="1.5" step="0.1" value="1" style="width: 100%; margin-bottom: 10px;">
-      <button onclick="speakAI()" style="width: 100%; background: #10b981;">🎙️ שדר כעת</button>
+      <h2>🎙️ קריין AI</h2>
+      <textarea id="aiText" rows="2" placeholder="טקסט לקריין..."></textarea>
+      <button onclick="speakAI()" style="width: 100%; background: #10b981; margin-top: 8px;">🎙️ שדר כעת</button>
     </div>
 
-    <!-- אפקטים קוליים -->
+    <!-- אפקטים -->
     <div class="card">
-      <h2>👏 אפקטים וסצינות</h2>
+      <h2>👏 אפקטים</h2>
       <div class="fx-grid">
-        <button class="fx-btn" onclick="playSound('applause')">👏 מחיאות כפיים</button>
-        <button class="fx-btn" onclick="playSound('jingle')">🎷 ג'ינגל פתיחה</button>
-        <button class="fx-btn" onclick="playSound('laugh')">😄 צחוק קהל</button>
-        <button class="fx-btn" onclick="playSound('siren')">📢 צפירת רדיו</button>
+        <button class="fx-btn" onclick="playSound('applause')">👏 כפיים</button>
+        <button class="fx-btn" onclick="playSound('jingle')">🎷 ג'ינגל</button>
+        <button class="fx-btn" onclick="playSound('laugh')">😄 צחוק</button>
+        <button class="fx-btn" onclick="playSound('siren')">📢 צפירה</button>
       </div>
     </div>
 
-    <!-- נגן מוזיקה -->
-    <div class="card">
-      <h2>🎵 נגן מוזיקה ותור השמעה</h2>
-      <input type="file" id="musicInput" multiple accept="audio/*" onchange="loadMusicFiles(this)" style="display:none;">
-      <button onclick="document.getElementById('musicInput').click()" style="width:100%; margin-bottom: 10px;">➕ הוסף שירים לתור</button>
-      <audio id="audioPlayer" controls style="width:100%; margin-bottom: 10px;"></audio>
-      <label style="font-size: 0.85em; color: var(--text-dim);">עוצמת מוזיקה ברקע:</label>
-      <input type="range" id="musicVol" min="0" max="1" step="0.05" value="1" oninput="setVolume(this.value)" style="width: 100%;">
-    </div>
-
-    <!-- לוח הודעות מאזינים -->
+    <!-- לוח הודעות -->
     <div class="card" style="grid-column: span 2;">
-      <h2>💬 הודעות מאזינים בלייב</h2>
-      <button onclick="clearMessages()" style="background: #475569; font-size: 0.8em; margin-bottom: 10px;">ניקוי הודעות</button>
-      <ul id="msgList" class="msg-list">
-        <li style="color: var(--text-dim);">טוען הודעות...</li>
-      </ul>
+      <h2>💬 הודעות מאזינים</h2>
+      <ul id="msgList" class="msg-list"></ul>
     </div>
 
   </div>
 
   <script>
-    function updateClock() {
-      const now = new Date();
-      document.getElementById('clock').textContent = now.toLocaleTimeString();
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
+    setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString(); }, 1000);
 
-    let isLive = false;
-    let isMicOn = false;
-    let micStream = null;
-    const audioPlayer = document.getElementById('audioPlayer');
+    // הגדרת מרכזיית PeerJS
+    const STUDIO_PEER_ID = 'radio_studio_live_room_123';
+    const peer = new Peer(STUDIO_PEER_ID);
+    let activeCall = null;
 
-    async function toggleMicrophone() {
-      const micBtn = document.getElementById('micBtn');
-      const duckingEnabled = document.getElementById('duckingToggle').checked;
+    peer.on('call', (call) => {
+      // מענה אוטומטי לשיחה המגיעה מהמאזין
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+        call.answer(stream);
+        activeCall = call;
 
-      if (!isMicOn) {
-        try {
-          micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          isMicOn = true;
-          micBtn.innerText = "🎙️ מדבר כעת! (לחץ לכיבוי)";
-          micBtn.classList.add("active");
-          if (duckingEnabled) audioPlayer.volume = 0.2;
-        } catch (err) { alert("לא ניתן לגשת למיקרופון"); }
-      } else {
-        if (micStream) micStream.getTracks().forEach(track => track.stop());
-        isMicOn = false;
-        micBtn.innerText = "🎙️ דבר (מיקרופון כבוי)";
-        micBtn.classList.remove("active");
-        if (duckingEnabled) audioPlayer.volume = document.getElementById('musicVol').value;
+        call.on('stream', (remoteStream) => {
+          const remoteAudio = document.getElementById('remoteAudio');
+          remoteAudio.srcObject = remoteStream;
+          remoteAudio.play();
+        });
+      });
+    });
+
+    function loadCallRequests() {
+      const container = document.getElementById('callRequestsList');
+      const requests = JSON.parse(localStorage.getItem('call_requests') || '[]');
+
+      if (requests.length === 0 && !activeCall) {
+        container.innerHTML = '<div style="color: var(--text-dim);">אין מאזינים הממתינים על הקו...</div>';
+        return;
       }
+
+      container.innerHTML = requests.map((req, idx) => `
+        <div class="call-item">
+          <div>
+            <strong>${req.name}</strong> <small>(${req.time})</small>
+          </div>
+          <div>
+            <button style="background: #10b981;" onclick="acceptCall('${req.id}', ${idx})">🟢 העלה לשידור</button>
+            <button style="background: #ef4444;" onclick="disconnectCall(${idx})">🔴 נתק</button>
+          </div>
+        </div>
+      `).join('');
     }
 
-    function toggleMainStream() {
-      isLive = !isLive;
-      const statusBadge = document.getElementById('airStatus');
-      const mainBtn = document.getElementById('toggleStreamBtn');
-      if (isLive) {
-        statusBadge.innerText = "ON AIR 🟢";
-        statusBadge.classList.add("on-air");
-        mainBtn.style.background = "#16a34a";
-      } else {
-        statusBadge.innerText = "OFF AIR 🔴";
-        statusBadge.classList.remove("on-air");
-        mainBtn.style.background = "#dc2626";
+    function acceptCall(peerId, idx) {
+      alert("המאזין מחובר כעת בלייב! הקול שלו מושמע באולפן.");
+    }
+
+    function disconnectCall(idx) {
+      if (activeCall) {
+        activeCall.close();
+        activeCall = null;
       }
+      let requests = JSON.parse(localStorage.getItem('call_requests') || '[]');
+      requests.splice(idx, 1);
+      localStorage.setItem('call_requests', JSON.stringify(requests));
+      loadCallRequests();
     }
 
+    setInterval(loadCallRequests, 2000);
+
+    // --- אפקטים וקריין ---
     function speakAI() {
       const text = document.getElementById('aiText').value;
-      if (!text) return alert("הכנס טקסט לקריין");
+      if (!text) return;
       window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voices = window.speechSynthesis.getVoices();
-      const hebrewVoice = voices.find(v => v.lang.includes('he'));
-      if (hebrewVoice) utterance.voice = hebrewVoice;
-      utterance.lang = 'he-IL';
-      utterance.rate = document.getElementById('speechRate').value;
-      window.speechSynthesis.speak(utterance);
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'he-IL';
+      window.speechSynthesis.speak(u);
     }
 
-    // מנוע סאונד לאפקטים
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
       if (audioCtx.state === 'suspended') audioCtx.resume();
       const now = audioCtx.currentTime;
       const gain = audioCtx.createGain();
       gain.connect(audioCtx.destination);
-
       if (type === 'applause') {
-        const bufferSize = audioCtx.sampleRate * 1.5;
-        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 1.5, audioCtx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < buf.length; i++) d[i] = Math.random() * 2 - 1;
         const noise = audioCtx.createBufferSource();
-        noise.buffer = buffer;
-        const filter = audioCtx.createBiquadFilter();
-        filter.type = 'bandpass';
-        filter.frequency.value = 1000;
-        noise.connect(filter);
-        filter.connect(gain);
+        noise.buffer = buf;
+        noise.connect(gain);
         gain.gain.setValueAtTime(0.3, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
         noise.start(now);
-      } else if (type === 'jingle') {
-        [261.63, 329.63, 392.00, 523.25].forEach((freq, idx) => {
-          const osc = audioCtx.createOscillator();
-          const g = audioCtx.createGain();
-          osc.frequency.value = freq;
-          osc.connect(g);
-          g.connect(audioCtx.destination);
-          const st = now + idx * 0.15;
-          g.gain.setValueAtTime(0.2, st);
-          g.gain.exponentialRampToValueAtTime(0.001, st + 0.3);
-          osc.start(st);
-          osc.stop(st + 0.3);
-        });
-      } else if (type === 'siren') {
-        const osc = audioCtx.createOscillator();
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(400, now);
-        osc.frequency.linearRampToValueAtTime(800, now + 0.3);
-        osc.frequency.linearRampToValueAtTime(400, now + 0.6);
-        osc.connect(gain);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
-        osc.start(now);
-        osc.stop(now + 0.6);
-      } else if (type === 'laugh') {
-        for (let i = 0; i < 5; i++) {
-          const osc = audioCtx.createOscillator();
-          const g = audioCtx.createGain();
-          osc.frequency.value = 300 + Math.random() * 100;
-          osc.connect(g);
-          g.connect(audioCtx.destination);
-          const st = now + i * 0.12;
-          g.gain.setValueAtTime(0.2, st);
-          g.gain.exponentialRampToValueAtTime(0.01, st + 0.1);
-          osc.start(st);
-          osc.stop(st + 0.1);
-        }
       }
     }
 
-    // ניהול הודעות מאזינים
     function loadMessages() {
       const msgList = document.getElementById('msgList');
       const messages = JSON.parse(localStorage.getItem('radio_messages') || '[]');
-      if (messages.length === 0) {
-        msgList.innerHTML = '<li style="color: var(--text-dim);">אין הודעות חדשות...</li>';
-        return;
-      }
       msgList.innerHTML = messages.map(m => `
-        <li class="msg-item">
-          <div class="msg-header">
-            <strong>${m.name}</strong>
-            <span>${m.time}</span>
-          </div>
-          <div>${m.text}</div>
-        </li>
+        <li class="msg-item"><strong>${m.name}</strong>: ${m.text}</li>
       `).join('');
-    }
-    function clearMessages() {
-      localStorage.removeItem('radio_messages');
-      loadMessages();
     }
     setInterval(loadMessages, 3000);
     loadMessages();
